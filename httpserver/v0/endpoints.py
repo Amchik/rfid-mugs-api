@@ -64,7 +64,7 @@ async def read_rfid(
     LOCK_STATE.open()
 
     # TODO: move notifications to .telegram module
-    if res["ty"] == "mug" and LAST_READ_RFID.is_user():
+    if res["ty"] == "mug" and LAST_READ_RFID is not None and LAST_READ_RFID.is_user():
         # TODO: make less sql requests
         await cur.execute(
             "select telegram_id from users where id = ?", [res["owner_id"]]
