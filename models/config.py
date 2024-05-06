@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from json import loads
+from os import getenv
 
 
 class Config(BaseModel):
@@ -16,7 +17,9 @@ class Config(BaseModel):
 
 CONFIG = None
 
-with open("config.json", "r") as fp:
+config_path = getenv("CONFIG_PATH", "config.json")
+
+with open(config_path, "r") as fp:
     cfg = fp.read()
     cfg = loads(cfg)
     CONFIG = Config(
