@@ -10,7 +10,7 @@ async def main():
     await init_database(get_config().database)
     app = start_server(None)
     # config = uvicorn.Config(app, loop=loop)
-    config = uvicorn.Config(app)
+    config = uvicorn.Config(app, host="0.0.0.0", server_header=False)
     server = uvicorn.Server(config)
     # loop.run_until_complete(server.serve())
     await asyncio.gather(
