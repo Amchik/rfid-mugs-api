@@ -43,12 +43,12 @@ async def read_rfid(
     cur = await get_connection()
     await cur.execute(
         """
-        SELECT null as id, id as owner_id, rfid_tag, '(user)' as name, 'user' AS ty
+        SELECT null as id, id as owner_id, rfid_tag, '(user)' as name, 'user' AS ty, telegram_id
         FROM users
         WHERE users.rfid_tag = ?1
         UNION
-        SELECT id, owner_id, rfid_tag, name, 'mug' AS ty
-        FROM mugs
+        SELECT mugs.id as id, mugs.owner_id as owner_id, mugs.rfid_tag as rfid_tag, mugs.name as name, 'mug' AS ty, users.telegram_id as telegram_id
+        FROM mugs INNER JOIN users ON mugs.owner_id = users.id
         WHERE mugs.rfid_tag = ?1
         """,
         [rfid_tag],
@@ -65,19 +65,27 @@ async def read_rfid(
 
     # TODO: move notifications to .telegram module
     if res["ty"] == "mug" and LAST_READ_RFID is not None and LAST_READ_RFID.is_user():
-        # TODO: make less sql requests
-        await cur.execute(
-            "select telegram_id from users where id = ?", [res["owner_id"]]
-        )
-        tgid = (await cur.fetchone())[0]
+        tgid = res["telegram_id"]
         await BOT.send_message(
             tgid,
             ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
-            + f" Ваша кружка <b>«{res['name']}»</b> была взята из шкафа",
+            + f" Ваша кружка <b>«{res['name']}»</b> была взята из шкафа"
+            + (
+                ""
+                if res["owner_id"] == LAST_READ_RFID.user_id
+                else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">другим пользователем</a>.'
+            ),
+        )
+        await BOT.send_message(
+            LAST_READ_RFID.telegram_id,
+            "🐶 Слыш пёс кружку на базу вернул (вы взяли не свою кружку. Пожалуйста, верните её в шкаф)",
         )
 
     LAST_READ_RFID = RFIDRead(
-        serial=rfid_tag, mug_id=res["id"], user_id=res["owner_id"]
+        serial=rfid_tag,
+        mug_id=res["id"],
+        user_id=res["owner_id"],
+        telegram_id=res["telegram_id"],
     ).created()
 
     return RFIDMug(ty=res["ty"], name=res["name"])
