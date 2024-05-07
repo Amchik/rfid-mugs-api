@@ -24,7 +24,7 @@ class RFIDRead(BaseModel):
         return self.known() and self.mug_id is None
 
     def is_mug(self):
-        return self.known()
+        return self.known() and self.mug_id is not None
 
 
 class LockState:

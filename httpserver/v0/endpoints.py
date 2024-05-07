@@ -113,8 +113,8 @@ class ActivationResult(Enum):
     DIRTY = "dirty"
 
 
-@router.post("/activate")
-async def activate_tag(
+@router.post("/rfid/register")
+async def register_tag(
     method: AuthMethod = Depends(authorization),
 ) -> Response[ActivationResult]:
     global LAST_READ_RFID, CURRENT_ACTIVATOR, BOT
@@ -123,26 +123,7 @@ async def activate_tag(
     if not LAST_READ_RFID or LAST_READ_RFID.is_outdated():
         raise LegacyException(Error.NOT_FOUND, "No actual cards scanned")
     if LAST_READ_RFID.known():
-        if LAST_READ_RFID.is_mug():
-            conn = await get_connection()
-            await conn.execute(
-                "select users.id as id, users.telegram_id as telegram_id, mugs.name as name from mugs inner join users on users.id = mugs.owner_id where users.id = ?",
-                [LAST_READ_RFID.user_id],
-            )
-            res = await conn.fetchone()
-            chat_id = res[1]
-            name = res[2]
-            LAST_READ_RFID = None
-            await BOT.send_message(
-                chat_id,
-                f"❗️ Ваша кружка «<b>{escapeHTML(name)}</b>» найдена грязной и была отправлена на парковку",
-            )
-            # TODO: move sending messages to .telegram module
-            return Response(response=ActivationResult.DIRTY)
-        else:
-            raise LegacyException(
-                Error.NOTHING_TO_DO, "Cannot activate thing that not mug"
-            )
+        raise LegacyException(Error.NOTHING_TO_DO, "Cannot activate known rfid tag")
     serial = LAST_READ_RFID.serial
     LAST_READ_RFID = None
     if CURRENT_ACTIVATOR.ty == ActivationThing.UpdateCard:
@@ -167,11 +148,31 @@ async def activate_tag(
         raise LegacyException(Error.NOT_FOUND, "Nothing to activate")
 
 
-@router.post("/invite")
-async def invite(method: AuthMethod = Depends(authorization)) -> Response[None]:
+@router.post("/rfid/dirty")
+async def report_dirty_mug(
+    method: AuthMethod = Depends(authorization),
+) -> Response[str]:
+    global LAST_READ_RFID, BOT
     if method != AuthMethod.BOX:
         raise LegacyException(Error.INVALID_TOKEN, "No access for this auth method")
-    return Response(response=None)
+    if LAST_READ_RFID.is_mug():
+        conn = await get_connection()
+        await conn.execute(
+            "select users.id as id, users.telegram_id as telegram_id, mugs.name as name from mugs inner join users on users.id = mugs.owner_id where users.id = ?",
+            [LAST_READ_RFID.user_id],
+        )
+        res = await conn.fetchone()
+        chat_id = res[1]
+        name = res[2]
+        LAST_READ_RFID = None
+        await BOT.send_message(
+            chat_id,
+            f"❗️ Ваша кружка «<b>{escapeHTML(name)}</b>» найдена грязной и была отправлена на парковку",
+        )
+        # TODO: move sending messages to .telegram module
+        return Response(response=name)
+    else:
+        raise LegacyException(Error.NOTHING_TO_DO, "Cannot activate thing that not mug")
 
 
 app.include_router(router)
