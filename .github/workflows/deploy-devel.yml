@@ -1,6 +1,6 @@
 name: Deploy to Development Server
 
-on: [workflow_call]
+on: [workflow_dispatch]
 
 jobs:
   build-and-push-image:
