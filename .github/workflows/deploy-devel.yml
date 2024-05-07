@@ -13,4 +13,4 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_DEV_SSH_KEY }}
       - name: Run deploy script on server
-        run: ssh deploy@${{ secrets.DEPLOY_DEV_IP }}
+        run: ssh -o StrictHostKeyChecking=no deploy@${{ secrets.DEPLOY_DEV_IP }}
