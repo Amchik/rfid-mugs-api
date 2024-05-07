@@ -1,0 +1,16 @@
+name: Deploy to Development Server
+
+on: [workflow_call]
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Import SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_DEV_SSH_KEY }}
+      - name: Run deploy script on server
+        run: ssh deploy@${{ secrets.DEPLOY_DEV_IP }}
