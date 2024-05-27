@@ -1,4 +1,5 @@
 import asyncio
+from time import time
 from fastapi import APIRouter, Depends
 
 from pydantic import BaseModel
@@ -66,6 +67,11 @@ async def read_rfid(
     # TODO: move notifications to .telegram module
     if res["ty"] == "mug" and LAST_READ_RFID is not None and LAST_READ_RFID.is_user():
         tgid = res["telegram_id"]
+        await cur.execute(
+            "UPDATE mugs SET last_taken_at = ?, last_taken_by = ? WHERE id = ?",
+            [int(time()), LAST_READ_RFID.user_id, res["id"]],
+        )
+        await commit_changes()
         await BOT.send_message(
             tgid,
             ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
@@ -76,10 +82,11 @@ async def read_rfid(
                 else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">другим пользователем</a>.'
             ),
         )
-        await BOT.send_message(
-            LAST_READ_RFID.telegram_id,
-            "🐶 Слыш пёс кружку на базу вернул (вы взяли не свою кружку. Пожалуйста, верните её в шкаф)",
-        )
+        if res["owner_id"] != LAST_READ_RFID.user_id:
+            await BOT.send_message(
+                LAST_READ_RFID.telegram_id,
+                f"🐶 Слыш пёс кружку на базу вернул (вы взяли не свою кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф)",
+            )
 
     LAST_READ_RFID = RFIDRead(
         serial=rfid_tag,
