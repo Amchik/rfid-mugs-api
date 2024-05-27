@@ -1,0 +1,8 @@
+{
+    "shared_keys": {
+        "box": "CHANGE ME",
+        "lock": "CHANGE ME"
+    },
+    "database": "/storage/mugs.sqlite",
+    "telegram_token": "123:abc"
+}
