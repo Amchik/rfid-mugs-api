@@ -12,7 +12,12 @@ CREATE TABLE IF NOT EXISTS mugs (
 
     rfid_tag TEXT NOT NULL UNIQUE,
 
-    FOREIGN KEY(owner_id) REFERENCES users(id)
+    last_taken_at INTEGER DEFAULT 0,
+    last_returned_at INTEGER DEFAULT 0,
+    last_taken_by INTEGER DEFAULT NULL,
+
+    FOREIGN KEY(owner_id) REFERENCES users(id),
+    FOREIGN KEY(last_taken_by) REFERENCES users(id)
 );
 
 
