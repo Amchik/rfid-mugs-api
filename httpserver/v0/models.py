@@ -9,6 +9,7 @@ class RFIDRead(BaseModel):
     mug_id: Optional[int] = None
     user_id: Optional[int] = None
     telegram_id: Optional[int] = None
+    telegram_name: Optional[str] = None
     created_at: float = 0.0
 
     def created(self) -> "RFIDRead":

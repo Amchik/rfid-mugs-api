@@ -44,11 +44,11 @@ async def read_rfid(
     cur = await get_connection()
     await cur.execute(
         """
-        SELECT null as id, id as owner_id, rfid_tag, '(user)' as name, 'user' AS ty, telegram_id
+        SELECT null as id, id as owner_id, rfid_tag, '(user)' as name, 'user' AS ty, telegram_id, telegram_name
         FROM users
         WHERE users.rfid_tag = ?1
         UNION
-        SELECT mugs.id as id, mugs.owner_id as owner_id, mugs.rfid_tag as rfid_tag, mugs.name as name, 'mug' AS ty, users.telegram_id as telegram_id
+        SELECT mugs.id as id, mugs.owner_id as owner_id, mugs.rfid_tag as rfid_tag, mugs.name as name, 'mug' AS ty, users.telegram_id as telegram_id, users.telegram_name as telegram_name
         FROM mugs INNER JOIN users ON mugs.owner_id = users.id
         WHERE mugs.rfid_tag = ?1
         """,
@@ -72,6 +72,11 @@ async def read_rfid(
             [int(time()), LAST_READ_RFID.user_id, res["id"]],
         )
         await commit_changes()
+        taker_name = (
+            escapeHTML(LAST_READ_RFID.telegram_name)
+            if LAST_READ_RFID.telegram_name is not None
+            else "другим пользователем"
+        )
         await BOT.send_message(
             tgid,
             ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
@@ -79,7 +84,7 @@ async def read_rfid(
             + (
                 ""
                 if res["owner_id"] == LAST_READ_RFID.user_id
-                else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">другим пользователем</a>.'
+                else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">{taker_name}</a>.'
             ),
         )
         if res["owner_id"] != LAST_READ_RFID.user_id:
@@ -93,6 +98,7 @@ async def read_rfid(
         mug_id=res["id"],
         user_id=res["owner_id"],
         telegram_id=res["telegram_id"],
+        telegram_name=res["telegram_name"],
     ).created()
 
     return RFIDMug(ty=res["ty"], name=res["name"])

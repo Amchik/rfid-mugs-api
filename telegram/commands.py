@@ -105,6 +105,8 @@ async def changecard(message: Message) -> None:
         ),
     )
 
+    telegram_name = message.chat.full_name
+
     async def callback(act: RFIDActivation):
         global BOT
         await BOT.edit_message_text(
@@ -113,6 +115,13 @@ async def changecard(message: Message) -> None:
             act.user_id,
             act.msg_id,
         )
+        # NOTE: optimize?
+        conn = await get_connection()
+        await conn.execute(
+            "UPDATE users SET telegram_name = ? WHERE telegram_id = ?",
+            [telegram_name, act.user_id],
+        )
+        await commit_changes()
 
     CURRENT_ACTIVATOR.set(
         ty=ActivationThing.UpdateCard,
@@ -145,7 +154,7 @@ async def send_newmug_confirmation(msg: Message, mug_name: Optional[str]):
     )
 
 
-from database import get_connection
+from database import commit_changes, get_connection
 
 
 @dp.message(Command("newmug"))

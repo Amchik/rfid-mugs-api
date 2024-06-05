@@ -48,6 +48,7 @@ class MugEntry(BaseModel):
     id: int
     name: str
     taker_telegram: Optional[int]
+    taker_name: Optional[str]
     last_taken_at: int
     owner_telegram: int
 
@@ -60,7 +61,8 @@ async def get_mug_by_id(con: Cursor, user_id: int, mug_id: int) -> Optional[MugE
             mugs.name,
             taker.telegram_id,
             mugs.last_taken_at,
-            owner.telegram_id as owner_telegram_id
+            owner.telegram_id as owner_telegram_id,
+            taker.telegram_name
         FROM mugs
             INNER JOIN users AS owner ON owner.id = mugs.owner_id
             LEFT  JOIN users AS taker ON taker.id = mugs.last_taken_by
@@ -78,6 +80,7 @@ async def get_mug_by_id(con: Cursor, user_id: int, mug_id: int) -> Optional[MugE
         taker_telegram=row[2],
         last_taken_at=row[3],
         owner_telegram=row[4],
+        taker_name=row[5],
     )
 
 
@@ -89,7 +92,8 @@ async def get_mugs(con: Cursor, user_id: int, offset: int = 0) -> list[MugEntry]
             mugs.name,
             taker.telegram_id,
             mugs.last_taken_at,
-            owner.telegram_id as owner_telegram_id
+            owner.telegram_id as owner_telegram_id,
+            taker.telegram_name
         FROM mugs
             INNER JOIN users AS owner ON owner.id = mugs.owner_id
             LEFT  JOIN users AS taker ON taker.id = mugs.last_taken_by
@@ -108,6 +112,7 @@ async def get_mugs(con: Cursor, user_id: int, offset: int = 0) -> list[MugEntry]
                 taker_telegram=v[2],
                 last_taken_at=v[3],
                 owner_telegram=v[4],
+                taker_name=v[5],
             ),
             rows,
         )
@@ -119,9 +124,12 @@ def format_mug_used_at(mug: MugEntry) -> str:
     last_used_time = dt.strftime(r"%d %b %H:%M")
     used_by = "вы"
     if mug.taker_telegram != mug.owner_telegram:
-        used_by = (
-            f'<a href="tg://user?id={mug.taker_telegram}">другим пользователем</a>'
+        taker_name = (
+            escapeHTML(mug.taker_name)
+            if mug.taker_name is not None
+            else "другим пользователем"
         )
+        used_by = f'<a href="tg://user?id={mug.taker_telegram}">{taker_name}</a>'
     return f"{last_used_time} ({used_by})"
 
 
