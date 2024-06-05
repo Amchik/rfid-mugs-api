@@ -120,7 +120,7 @@ async def get_mugs(con: Cursor, user_id: int, offset: int = 0) -> list[MugEntry]
 
 
 def format_mug_used_at(mug: MugEntry) -> str:
-    dt = datetime(1970, 1, 1) + timedelta(seconds=mug.last_taken_at)
+    dt = datetime(1970, 1, 1, 3) + timedelta(seconds=mug.last_taken_at)
     last_used_time = dt.strftime(r"%d %b %H:%M")
     used_by = "вы"
     if mug.taker_telegram != mug.owner_telegram:
