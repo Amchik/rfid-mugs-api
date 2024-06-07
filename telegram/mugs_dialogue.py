@@ -242,7 +242,8 @@ async def mug_action_query(query: CallbackQuery, callback_data: MugActionsQuery)
     lst_used_at = (
         "<i>(никогда)</i>" if mug.taker_telegram is None else format_mug_used_at(mug)
     )
-    msg_prefix = f"❯❯❯ №{mug_no} <b>{escapeHTML(mug.name)}</b>\n\nПоследнее использование: {lst_used_at}"
+    emoji = "🟡" if mug.last_taken_at > mug.last_returned_at else ""
+    msg_prefix = f"❯❯❯ №{mug_no} {emoji} <b>{escapeHTML(mug.name)}</b>\n\nПоследнее использование: {lst_used_at}"
     if act == MugActionTy.VIEW:
         await query.message.edit_text(
             msg_prefix + "\nВыберете действие:",
@@ -317,8 +318,13 @@ async def mug_action_query(query: CallbackQuery, callback_data: MugActionsQuery)
             mug_no=mug_no,
             current_offset=offset,
         ).pack()
+        msg_suffix = ""
+        if mug.last_returned_at > mug.last_taken_at:
+            msg_suffix = "\n❗️ <b>Кружка сейчас находится в шкафу.</b> Перед удалением заберите её из шкафа"
         await query.message.edit_text(
-            msg_prefix + "\n\n<b>⚠️ Вы действительно хотите удалить кружку?</b>",
+            msg_prefix
+            + "\n\n<b>⚠️ Вы действительно хотите удалить кружку?</b>"
+            + msg_suffix,
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
