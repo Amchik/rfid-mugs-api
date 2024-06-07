@@ -50,6 +50,7 @@ class MugEntry(BaseModel):
     taker_telegram: Optional[int]
     taker_name: Optional[str]
     last_taken_at: int
+    last_returned_at: int
     owner_telegram: int
 
 
@@ -62,7 +63,8 @@ async def get_mug_by_id(con: Cursor, user_id: int, mug_id: int) -> Optional[MugE
             taker.telegram_id,
             mugs.last_taken_at,
             owner.telegram_id as owner_telegram_id,
-            taker.telegram_name
+            taker.telegram_name,
+            mugs.last_returned_at
         FROM mugs
             INNER JOIN users AS owner ON owner.id = mugs.owner_id
             LEFT  JOIN users AS taker ON taker.id = mugs.last_taken_by
@@ -81,6 +83,7 @@ async def get_mug_by_id(con: Cursor, user_id: int, mug_id: int) -> Optional[MugE
         last_taken_at=row[3],
         owner_telegram=row[4],
         taker_name=row[5],
+        last_returned_at=row[6],
     )
 
 
@@ -93,7 +96,8 @@ async def get_mugs(con: Cursor, user_id: int, offset: int = 0) -> list[MugEntry]
             taker.telegram_id,
             mugs.last_taken_at,
             owner.telegram_id as owner_telegram_id,
-            taker.telegram_name
+            taker.telegram_name,
+            mugs.last_returned_at
         FROM mugs
             INNER JOIN users AS owner ON owner.id = mugs.owner_id
             LEFT  JOIN users AS taker ON taker.id = mugs.last_taken_by
@@ -113,6 +117,7 @@ async def get_mugs(con: Cursor, user_id: int, offset: int = 0) -> list[MugEntry]
                 last_taken_at=v[3],
                 owner_telegram=v[4],
                 taker_name=v[5],
+                last_returned_at=v[6],
             ),
             rows,
         )
@@ -130,7 +135,11 @@ def format_mug_used_at(mug: MugEntry) -> str:
             else "другим пользователем"
         )
         used_by = f'<a href="tg://user?id={mug.taker_telegram}">{taker_name}</a>'
-    return f"{last_used_time} ({used_by})"
+    s = f"{last_used_time} ({used_by})"
+    if mug.last_returned_at > mug.last_taken_at:
+        dt = datetime(1970, 1, 1, 3) + timedelta(seconds=mug.last_returned_at)
+        s += f", возвращена " + dt.strftime(r"%H:%M")
+    return s
 
 
 def format_mugs(mugs: list[MugEntry], offset: int = 0) -> str:
@@ -140,8 +149,9 @@ def format_mugs(mugs: list[MugEntry], offset: int = 0) -> str:
         lst_used_str = (
             "(никогда)" if v.taker_telegram is None else format_mug_used_at(v)
         )
+        emoji = "🟡" if v.last_taken_at > v.last_returned_at else ""
         return (
-            f"<b><u>[{i}]</u> {escapeHTML(v.name)}</b>\n"
+            f"<b><u>[{i}]</u> {emoji} {escapeHTML(v.name)}</b>\n"
             + f"<i>Последнее использование: {lst_used_str}</i>\n"
         )
 

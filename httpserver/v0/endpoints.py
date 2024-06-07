@@ -65,33 +65,40 @@ async def read_rfid(
     LOCK_STATE.open()
 
     # TODO: move notifications to .telegram module
-    if res["ty"] == "mug" and LAST_READ_RFID is not None and LAST_READ_RFID.is_user():
-        tgid = res["telegram_id"]
-        await cur.execute(
-            "UPDATE mugs SET last_taken_at = ?, last_taken_by = ? WHERE id = ?",
-            [int(time()), LAST_READ_RFID.user_id, res["id"]],
-        )
-        await commit_changes()
-        taker_name = (
-            escapeHTML(LAST_READ_RFID.telegram_name)
-            if LAST_READ_RFID.telegram_name is not None
-            else "другим пользователем"
-        )
-        await BOT.send_message(
-            tgid,
-            ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
-            + f" Ваша кружка <b>«{res['name']}»</b> была взята из шкафа"
-            + (
-                ". Пожалуйста, при возвращении <b>прикладывайте кружку</b>, а не карту."
-                if res["owner_id"] == LAST_READ_RFID.user_id
-                else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">{taker_name}</a>.'
-            ),
-        )
-        if res["owner_id"] != LAST_READ_RFID.user_id:
-            await BOT.send_message(
-                LAST_READ_RFID.telegram_id,
-                f"😡 Вы взяли чужую кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф",
+    if res["ty"] == "mug":
+        if LAST_READ_RFID is not None and LAST_READ_RFID.is_user():
+            tgid = res["telegram_id"]
+            await cur.execute(
+                "UPDATE mugs SET last_taken_at = ?, last_taken_by = ? WHERE id = ?",
+                [int(time()), LAST_READ_RFID.user_id, res["id"]],
             )
+            await commit_changes()
+            taker_name = (
+                escapeHTML(LAST_READ_RFID.telegram_name)
+                if LAST_READ_RFID.telegram_name is not None
+                else "другим пользователем"
+            )
+            await BOT.send_message(
+                tgid,
+                ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
+                + f" Ваша кружка <b>«{res['name']}»</b> была взята из шкафа"
+                + (
+                    ". Пожалуйста, при возвращении <b>прикладывайте кружку</b>, а не карту."
+                    if res["owner_id"] == LAST_READ_RFID.user_id
+                    else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">{taker_name}</a>.'
+                ),
+            )
+            if res["owner_id"] != LAST_READ_RFID.user_id:
+                await BOT.send_message(
+                    LAST_READ_RFID.telegram_id,
+                    f"😡 Вы взяли чужую кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф",
+                )
+        else:  # mug returned
+            await cur.execute(
+                "UPDATE mugs SET last_returned_at = ? WHERE id = ?",
+                [int(time()), res["id"]],
+            )
+            await commit_changes()
 
     LAST_READ_RFID = RFIDRead(
         serial=rfid_tag,
