@@ -22,6 +22,7 @@
     $ docker run \
         --restart on-failure:3 \
         --env CONFIG_PATH=/storage/config.json \
+        --env POSTER_PATH=/storage/optional-poster.png \
         -v /opt/rfid-mugs-api:/storage \
         -d \
         --name rfid-mugs-api-py-prod \

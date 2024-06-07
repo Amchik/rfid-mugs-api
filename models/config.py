@@ -18,6 +18,7 @@ class Config(BaseModel):
 CONFIG = None
 
 config_path = getenv("CONFIG_PATH", "config.json")
+POSTER_PATH = getenv("POSTER_PATH", "poster.png")
 
 with open(config_path, "r") as fp:
     cfg = fp.read()
