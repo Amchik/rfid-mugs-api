@@ -82,7 +82,7 @@ async def read_rfid(
             ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
             + f" Ваша кружка <b>«{res['name']}»</b> была взята из шкафа"
             + (
-                ""
+                ". Пожалуйста, при возвращении <b>прикладывайте кружку</b>, а не карту."
                 if res["owner_id"] == LAST_READ_RFID.user_id
                 else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">{taker_name}</a>.'
             ),
@@ -90,7 +90,7 @@ async def read_rfid(
         if res["owner_id"] != LAST_READ_RFID.user_id:
             await BOT.send_message(
                 LAST_READ_RFID.telegram_id,
-                f"🐶 Слыш пёс кружку на базу вернул (вы взяли не свою кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф)",
+                f"😡 Вы взяли чужую кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф",
             )
 
     LAST_READ_RFID = RFIDRead(

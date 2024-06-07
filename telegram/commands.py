@@ -259,7 +259,8 @@ async def register_mug(query: CallbackQuery, callback_data: RegisterMugQuery):
         await BOT.edit_message_text(
             "<b>❯❯❯ Регистрация кружки ☕️</b>\n\n"
             + "Кружка зарегистрированна.\n"
-            + f"Название кружки: <b>{escapeHTML(callback_data.name)}</b>",
+            + f"Название кружки: <b>{escapeHTML(callback_data.name)}</b>\n\n"
+            + "<b>Важно:</b> при возвращении в шкаф <u>прикладывайте к считывателю кружку</u>, а не карту.",
             act.user_id,
             act.msg_id,
         )
