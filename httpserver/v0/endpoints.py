@@ -44,11 +44,27 @@ async def read_rfid(
     cur = await get_connection()
     await cur.execute(
         """
-        SELECT null as id, id as owner_id, rfid_tag, '(user)' as name, 'user' AS ty, telegram_id, telegram_name
+        SELECT
+            null as id,
+            id as owner_id,
+            rfid_tag,
+            '(user)' as name,
+            'user' AS ty,
+            telegram_id,
+            telegram_name,
+            0 as delta
         FROM users
         WHERE users.rfid_tag = ?1
         UNION
-        SELECT mugs.id as id, mugs.owner_id as owner_id, mugs.rfid_tag as rfid_tag, mugs.name as name, 'mug' AS ty, users.telegram_id as telegram_id, users.telegram_name as telegram_name
+        SELECT
+            mugs.id as id,
+            mugs.owner_id as owner_id,
+            mugs.rfid_tag as rfid_tag,
+            mugs.name as name,
+            'mug' AS ty,
+            users.telegram_id as telegram_id,
+            users.telegram_name as telegram_name,
+            (mugs.last_taken_at - mugs.last_returned_at) as delta
         FROM mugs INNER JOIN users ON mugs.owner_id = users.id
         WHERE mugs.rfid_tag = ?1
         """,
@@ -66,7 +82,7 @@ async def read_rfid(
 
     # TODO: move notifications to .telegram module
     if res["ty"] == "mug":
-        if LAST_READ_RFID is not None and LAST_READ_RFID.is_user():
+        if LAST_READ_RFID is not None and LAST_READ_RFID.is_user() and res["delta"] > 0:
             tgid = res["telegram_id"]
             await cur.execute(
                 "UPDATE mugs SET last_taken_at = ?, last_taken_by = ? WHERE id = ?",
