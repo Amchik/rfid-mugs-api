@@ -82,7 +82,7 @@ async def read_rfid(
         LOCK_STATE.open()
     # TODO: move notifications to .telegram module
     elif res["ty"] == "mug":
-        if LAST_READ_RFID is not None and LAST_READ_RFID.is_user() and res["delta"] > 0:
+        if LAST_READ_RFID is not None and LAST_READ_RFID.is_user() and res["delta"] < 0:
             tgid = res["telegram_id"]
             await cur.execute(
                 "UPDATE mugs SET last_taken_at = ?, last_taken_by = ? WHERE id = ?",
