@@ -78,10 +78,10 @@ async def read_rfid(
     res = dict(zip([col[0] for col in cur.description], row))
 
     # TODO: checks
-    LOCK_STATE.open()
-
+    if res["ty"] == "user":
+        LOCK_STATE.open()
     # TODO: move notifications to .telegram module
-    if res["ty"] == "mug":
+    elif res["ty"] == "mug":
         if LAST_READ_RFID is not None and LAST_READ_RFID.is_user() and res["delta"] > 0:
             tgid = res["telegram_id"]
             await cur.execute(
@@ -110,6 +110,7 @@ async def read_rfid(
                     f"😡 Вы взяли чужую кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф",
                 )
         else:  # mug returned
+            LOCK_STATE.open()
             await cur.execute(
                 "UPDATE mugs SET last_returned_at = ? WHERE id = ?",
                 [int(time()), res["id"]],
