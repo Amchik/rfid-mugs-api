@@ -77,6 +77,10 @@ async def read_rfid(
 
     res = dict(zip([col[0] for col in cur.description], row))
 
+    # Check if last LAST_READ_RFID actual
+    if LAST_READ_RFID.is_outdated():
+        LAST_READ_RFID = None
+
     # TODO: checks
     if res["ty"] == "user":
         LOCK_STATE.open()
