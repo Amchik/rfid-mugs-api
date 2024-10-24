@@ -46,14 +46,16 @@ async def read_rfid(
         """
         SELECT
             null as id,
-            id as owner_id,
-            rfid_tag,
+            users.id as owner_id,
+            users.rfid_tag,
             '(user)' as name,
             'user' AS ty,
             telegram_id,
             telegram_name,
-            0 as delta
+            0 as delta,
+            (mugs.id is not null) as is_mug
         FROM users
+            LEFT JOIN mugs ON mugs.owner_id = users.id
         WHERE users.rfid_tag = ?1
         UNION
         SELECT
@@ -64,7 +66,8 @@ async def read_rfid(
             'mug' AS ty,
             users.telegram_id as telegram_id,
             users.telegram_name as telegram_name,
-            (mugs.last_taken_at - mugs.last_returned_at) as delta
+            (mugs.last_taken_at - mugs.last_returned_at) as delta,
+            false as is_mug
         FROM mugs INNER JOIN users ON mugs.owner_id = users.id
         WHERE mugs.rfid_tag = ?1
         """,
@@ -78,11 +81,12 @@ async def read_rfid(
     res = dict(zip([col[0] for col in cur.description], row))
 
     # Check if last LAST_READ_RFID actual
-    if LAST_READ_RFID.is_outdated():
+    if LAST_READ_RFID is not None and LAST_READ_RFID.is_outdated():
         LAST_READ_RFID = None
 
     # TODO: checks
-    if res["ty"] == "user":
+    if res["ty"] == "user" and res["is_mug"] == "1":
+        # Do not open door if user doesn't have any mugs
         LOCK_STATE.open()
     # TODO: move notifications to .telegram module
     elif res["ty"] == "mug":

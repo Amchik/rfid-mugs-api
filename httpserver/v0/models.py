@@ -16,7 +16,7 @@ class RFIDRead(BaseModel):
         self.created_at = time()
         return self
 
-    def is_outdated(self, timeout: float = 90.0) -> bool:
+    def is_outdated(self, timeout: float = 45.0) -> bool:
         return self.created_at + timeout < time()
 
     def known(self):
