@@ -12,6 +12,7 @@ from aiogram.types import (
 )
 from aiogram.filters.callback_data import CallbackData
 from models.activation import CURRENT_ACTIVATOR, ActivationThing, RFIDActivation
+from models.v0 import LOCK_STATE, LAST_READ_RFID, RFIDRead
 import re
 
 dp = Router()
@@ -72,6 +73,10 @@ class ChangeMugNameQuery(CallbackData, prefix="v1+cmn"):
 
 
 class CancelDialogueQuery(CallbackData, prefix="v1+cd"):
+    pass
+
+
+class OpenDoorQuery(CallbackData, prefix="v1+od"):
     pass
 
 
@@ -175,6 +180,68 @@ async def newmug(msg: Message) -> None:
         else "Кружка"
     )
     await send_newmug_confirmation(msg, mug_name)
+
+@dp.message(Command("open"))
+async def openbox(msg: Message):
+    conn = await get_connection()
+    await conn.execute(
+        "select users.id, (mugs.id is not null) as is_mugs, telegram_name \
+            from users left join mugs on mugs.owner_id = users.id \
+            where users.telegram_id = ?",
+        [msg.chat.id]
+    )
+    res = (await conn.fetchone())
+    user_id = res[0]
+    is_mug = res[1] == 1
+    if not is_mug:
+        return await msg.reply(
+                "❌ Вы не можете открыть шкаф, так как у вас нет кружек."
+                )
+    await msg.reply(
+        "❯❯❯ <b>Подтвердите открытие шкафа</b>\n"
+        + "❗️ Если вы хотите вернуть кружку, то просто приложите её к считывателю.\n\n"
+        + "Просим Вас не открывать шкаф, если вы не стоите рядом.",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🚫 Отменить", callback_data=CancelDialogueQuery().pack()
+                    ),
+                    InlineKeyboardButton(
+                        text="🔓 Открыть", callback_data=OpenDoorQuery().pack()
+                    ),
+                ]
+            ]
+        ),
+    )
+
+@dp.callback_query(OpenDoorQuery.filter())
+async def open_door_query(query: CallbackQuery):
+    global LOCK_STATE, LAST_READ_RFID
+    conn = await get_connection()
+    await conn.execute(
+        "select users.id, (mugs.id is not null) as is_mugs, telegram_name \
+            from users left join mugs on mugs.owner_id = users.id \
+            where users.telegram_id = ?",
+        [query.message.chat.id]
+    )
+    res = (await conn.fetchone())
+    user_id = res[0]
+    is_mug = res[1] == 1
+    if not is_mug:
+        await query.answer("Вы не можете открыть шкаф, так как у вас нет кружек.", show_alert=True)
+        return
+    await query.message.edit_text(
+        "✅ <b>Шкаф открыт.</b> Не забудьте поднести взятую кружку к сканеру"
+    )
+    LAST_READ_RFID.set(RFIDRead(
+        serial=None,
+        mug_id=None,
+        user_id=user_id,
+        telegram_id=query.message.chat.id,
+        telegram_name=res[2],
+    ).created())
+    LOCK_STATE.open()
 
 
 @dp.callback_query(ChangeMugNameQuery.filter())

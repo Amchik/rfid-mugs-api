@@ -13,19 +13,15 @@ from telegram.tgcore import BOT
 
 from ..app import app
 from .auth import authorization, AuthMethod
-from .models import LockState, RFIDRead
 from .apimodel import Error, LegacyException, Response
 from models.activation import CURRENT_ACTIVATOR, ActivationThing
+from models.v0 import LockState, RFIDRead, LOCK_STATE, LAST_READ_RFID
 
 
 router = APIRouter(
     prefix="/v0",
     tags=["v0"],
 )
-
-LAST_READ_RFID: Optional[RFIDRead] = None
-LOCK_STATE: LockState = LockState()
-
 
 class RFIDMug(BaseModel):
     ok: bool = True
@@ -75,46 +71,46 @@ async def read_rfid(
     )
     row = await cur.fetchone()
     if not row:
-        LAST_READ_RFID = RFIDRead(serial=rfid_tag).created()
+        LAST_READ_RFID.set(RFIDRead(serial=rfid_tag).created())
         raise LegacyException(Error.NOT_FOUND, "RFID tag does not exists")
 
     res = dict(zip([col[0] for col in cur.description], row))
 
     # Check if last LAST_READ_RFID actual
-    if LAST_READ_RFID is not None and LAST_READ_RFID.is_outdated():
-        LAST_READ_RFID = None
+    if not LAST_READ_RFID.is_none() and LAST_READ_RFID.value.is_outdated():
+        LAST_READ_RFID.unset()
 
     # TODO: checks
-    if res["ty"] == "user" and res["is_mug"] == "1":
+    if res["ty"] == "user" and res["is_mug"] == 1:
         # Do not open door if user doesn't have any mugs
         LOCK_STATE.open()
     # TODO: move notifications to .telegram module
     elif res["ty"] == "mug":
-        if LAST_READ_RFID is not None and LAST_READ_RFID.is_user() and res["delta"] < 0:
+        if not LAST_READ_RFID.is_none() and LAST_READ_RFID.value.is_user() and res["delta"] < 0:
             tgid = res["telegram_id"]
             await cur.execute(
                 "UPDATE mugs SET last_taken_at = ?, last_taken_by = ? WHERE id = ?",
-                [int(time()), LAST_READ_RFID.user_id, res["id"]],
+                [int(time()), LAST_READ_RFID.value.user_id, res["id"]],
             )
             await commit_changes()
             taker_name = (
-                escapeHTML(LAST_READ_RFID.telegram_name)
-                if LAST_READ_RFID.telegram_name is not None
+                escapeHTML(LAST_READ_RFID.value.telegram_name)
+                if LAST_READ_RFID.value.telegram_name is not None
                 else "другим пользователем"
             )
             await BOT.send_message(
                 tgid,
-                ("⭐️" if res["owner_id"] == LAST_READ_RFID.user_id else "❗️")
+                ("⭐️" if res["owner_id"] == LAST_READ_RFID.value.user_id else "❗️")
                 + f" Ваша кружка <b>«{res['name']}»</b> была взята из шкафа"
                 + (
                     ". Пожалуйста, при возвращении <b>прикладывайте кружку</b>, а не карту."
-                    if res["owner_id"] == LAST_READ_RFID.user_id
-                    else f' <a href="tg://user?id={LAST_READ_RFID.telegram_id}">{taker_name}</a>.'
+                    if res["owner_id"] == LAST_READ_RFID.value.user_id
+                    else f' <a href="tg://user?id={LAST_READ_RFID.value.telegram_id}">{taker_name}</a>.'
                 ),
             )
-            if res["owner_id"] != LAST_READ_RFID.user_id:
+            if res["owner_id"] != LAST_READ_RFID.value.user_id:
                 await BOT.send_message(
-                    LAST_READ_RFID.telegram_id,
+                    LAST_READ_RFID.value.telegram_id,
                     f"😡 Вы взяли чужую кружку «<b>{escapeHTML(res['name'])}</b>». Пожалуйста, верните её в шкаф",
                 )
         else:  # mug returned
@@ -125,13 +121,13 @@ async def read_rfid(
             )
             await commit_changes()
 
-    LAST_READ_RFID = RFIDRead(
+    LAST_READ_RFID.set(RFIDRead(
         serial=rfid_tag,
         mug_id=res["id"],
         user_id=res["owner_id"],
         telegram_id=res["telegram_id"],
         telegram_name=res["telegram_name"],
-    ).created()
+    ).created())
 
     return RFIDMug(ty=res["ty"], name=res["name"])
 
@@ -173,12 +169,12 @@ async def register_tag(
     global LAST_READ_RFID, CURRENT_ACTIVATOR, BOT
     if method != AuthMethod.BOX:
         raise LegacyException(Error.INVALID_TOKEN, "No access for this auth method")
-    if not LAST_READ_RFID or LAST_READ_RFID.is_outdated():
+    if LAST_READ_RFID.is_none() or LAST_READ_RFID.value.is_outdated() or LAST_READ_RFID.value.serial is None:
         raise LegacyException(Error.NOT_FOUND, "No actual cards scanned")
-    if LAST_READ_RFID.known():
+    if LAST_READ_RFID.value.known():
         raise LegacyException(Error.NOTHING_TO_DO, "Cannot activate known rfid tag")
-    serial = LAST_READ_RFID.serial
-    LAST_READ_RFID = None
+    serial = LAST_READ_RFID.value.serial
+    LAST_READ_RFID.unset()
     if CURRENT_ACTIVATOR.ty == ActivationThing.UpdateCard:
         conn = await get_connection()
         await conn.execute(
@@ -208,16 +204,16 @@ async def report_dirty_mug(
     global LAST_READ_RFID, BOT
     if method != AuthMethod.BOX:
         raise LegacyException(Error.INVALID_TOKEN, "No access for this auth method")
-    if LAST_READ_RFID.is_mug():
+    if LAST_READ_RFID.value.is_mug():
         conn = await get_connection()
         await conn.execute(
             "select users.id as id, users.telegram_id as telegram_id, mugs.name as name from mugs inner join users on users.id = mugs.owner_id where users.id = ?",
-            [LAST_READ_RFID.user_id],
+            [LAST_READ_RFID.value.user_id],
         )
         res = await conn.fetchone()
         chat_id = res[1]
         name = res[2]
-        LAST_READ_RFID = None
+        LAST_READ_RFID.unset()
         await BOT.send_message(
             chat_id,
             f"❗️ Ваша кружка «<b>{escapeHTML(name)}</b>» найдена грязной и была отправлена на парковку",
