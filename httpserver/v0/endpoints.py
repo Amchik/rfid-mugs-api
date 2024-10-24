@@ -81,7 +81,9 @@ async def read_rfid(
         LAST_READ_RFID.unset()
 
     # TODO: checks
-    if res["ty"] == "user" and res["is_mug"] == 1:
+    # FIXME: add res["is_mug"] == 1 check
+    if res["ty"] == "user":
+        #if res["ty"] == "user" and res["is_mug"] == 1:
         # Do not open door if user doesn't have any mugs
         LOCK_STATE.open()
     # TODO: move notifications to .telegram module
